@@ -1,0 +1,10 @@
+[project]
+name = "sketches"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+basement-plan = "basement_floor_plan.plan:main"
