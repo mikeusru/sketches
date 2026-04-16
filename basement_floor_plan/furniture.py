@@ -1,7 +1,7 @@
 """Furniture placement for the basement floor plan."""
 
 from .helpers import px
-from .structure import Geo
+from .basement import Geo
 
 
 def draw_furniture():

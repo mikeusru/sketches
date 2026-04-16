@@ -3,16 +3,15 @@
 from pathlib import Path
 import argparse
 
-from .helpers import svg_preamble
-from .structure import draw_structure
+from .basement import build_plan
+from .renderer import render, render_wall_labels, close_svg
 from .furniture import draw_furniture
+from .validate import validate_all
 
 
-def main():
-    svg = svg_preamble()
-    svg += draw_structure()
-    furn = draw_furniture()
-    return svg, furn
+def _write(path, lines):
+    path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"Saved to {path}")
 
 
 def cli():
@@ -23,30 +22,39 @@ def cli():
                         help="Generate both furnished and unfurnished SVGs")
     args = parser.parse_args()
 
-    svg, furn = main()
+    plan = build_plan()
+
+    errors, warnings = validate_all(plan)
+    if warnings:
+        print(f"[!] {len(warnings)} warning(s):")
+        for w in warnings:
+            print(f"  - {w}")
+    if errors:
+        print(f"[X] {len(errors)} error(s):")
+        for e in errors:
+            print(f"  - {e}")
+        raise SystemExit(1)
+
+    structure = render(plan)       # ends with '</g>'
+    wall_labels = render_wall_labels(plan)
+    furn = draw_furniture()         # SVG lines (drawn inside the same <g>)
     out_dir = Path(__file__).resolve().parent
 
+    # Inside the <g>, layer order: structure → (furniture) → wall labels.
+    # Wall labels paint last so their letter-badges stay readable over
+    # furniture fills.
+    struct_open = structure[:-1]
+    struct_close = [structure[-1]]
+    bare = struct_open + wall_labels + struct_close + close_svg()
+    full = struct_open + furn + wall_labels + struct_close + close_svg()
+
     if args.both:
-        # Unfurnished
-        bare = svg + ['</g>', '</svg>']
-        p1 = out_dir / "basement_plan.svg"
-        p1.write_text("\n".join(bare), encoding="utf-8")
-        print(f"Saved to {p1}")
-        # Furnished
-        full = svg + furn + ['</g>', '</svg>']
-        p2 = out_dir / "basement_plan_furnished.svg"
-        p2.write_text("\n".join(full), encoding="utf-8")
-        print(f"Saved to {p2}")
+        _write(out_dir / "basement_plan.svg", bare)
+        _write(out_dir / "basement_plan_furnished.svg", full)
     elif args.furniture:
-        full = svg + furn + ['</g>', '</svg>']
-        p = out_dir / "basement_plan_furnished.svg"
-        p.write_text("\n".join(full), encoding="utf-8")
-        print(f"Saved to {p}")
+        _write(out_dir / "basement_plan_furnished.svg", full)
     else:
-        bare = svg + ['</g>', '</svg>']
-        p = out_dir / "basement_plan.svg"
-        p.write_text("\n".join(bare), encoding="utf-8")
-        print(f"Saved to {p}")
+        _write(out_dir / "basement_plan.svg", bare)
 
 
 if __name__ == "__main__":
